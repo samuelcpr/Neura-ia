@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: neuraljuris-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./storage:/data
+      - ./datasets:/app/datasets
+      - ./models:/app/models
+      - ./backend/app:/app/app
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATA_DIR: /data
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+    depends_on:
+      - ollama
+    mem_limit: 3g
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: neuraljuris-ollama
+    restart: unless-stopped
+    volumes:
+      - ./models/ollama:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    mem_limit: 4g
+    environment:
+      OLLAMA_KEEP_ALIVE: 5m

@@ -1,0 +1,28 @@
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+
+# Dados gerados em runtime (uploads, banco SQLite, cache de áudio TTS)
+storage/
+
+# Modelos baixados pelo Ollama (pesados, baixados via script)
+models/ollama/
+models/*.gguf
+models/*.bin
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# Node (frontend futuro)
+node_modules/
+frontend/dist/
+
+# Sistema
+.DS_Store
+*.log

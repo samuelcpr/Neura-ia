@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuralJuris AI — Chat</title>
+<style>
+  :root{
+    --green:#009c3b; --green-dark:#006b24; --green-light:#e8f7ec;
+    --yellow:#ffdf00; --yellow-dark:#e6c800;
+    --bg:#f7f7f8; --sidebar:#0b3d1e; --sidebar-hover:#11522b;
+    --text:#1a1a1a; --muted:#6b7280; --border:#e5e7eb;
+    --user-bubble:#009c3b; --ai-bubble:#ffffff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+
+  /* ===== Sidebar ===== */
+  #sidebar{width:270px;background:var(--sidebar);color:#d1fae5;display:flex;flex-direction:column;flex-shrink:0}
+  #sidebar .brand{display:flex;align-items:center;gap:.6rem;padding:1rem;border-bottom:1px solid rgba(255,255,255,.1)}
+  #sidebar .brand .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--yellow));display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.3);position:relative;overflow:visible}
+  #sidebar .brand .logo .flag{position:absolute;right:-5px;bottom:-5px;font-size:.72rem;background:#fff;border-radius:50%;padding:1px 3px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1.5px solid var(--green)}
+  #sidebar .brand b{font-size:1rem;color:#fff;line-height:1.1}
+  #sidebar .brand small{display:block;color:#86efac;font-size:.68rem}
+  #sidebar nav{padding:.6rem;display:flex;flex-direction:column;gap:.3rem}
+  #sidebar button.side{background:transparent;border:0;color:#d1fae5;text-align:left;padding:.6rem .7rem;border-radius:.5rem;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:.55rem}
+  #sidebar button.side:hover{background:var(--sidebar-hover)}
+  #sidebar .section{padding:.8rem .7rem .3rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:#6ee7a0}
+  #sidebar .doc-item{padding:.45rem .7rem;font-size:.78rem;color:#a7f3c9;border-radius:.4rem;cursor:default;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #sidebar .doc-item:hover{background:var(--sidebar-hover)}
+  #sidebar .doc-item .tag{display:inline-block;background:rgba(255,223,0,.18);color:var(--yellow);border-radius:.25rem;padding:.02rem .35rem;font-size:.62rem;margin-right:.3rem}
+  #sidebar footer{margin-top:auto;padding:.7rem;border-top:1px solid rgba(255,255,255,.1);font-size:.72rem;color:#86efac}
+  #sidebar input[type=password]{width:100%;padding:.4rem .5rem;border-radius:.4rem;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.25);color:#fff;font-size:.75rem;margin-top:.4rem}
+
+  /* ===== Chat ===== */
+  #main{flex:1;display:flex;flex-direction:column;min-width:0}
+  #chatHeader{padding:.8rem 1.4rem;border-bottom:1px solid var(--border);background:#fff;display:flex;align-items:center;gap:.8rem}
+  #chatHeader .title{font-weight:600;font-size:.95rem}
+  #chatHeader .badge{background:var(--green-light);color:var(--green-dark);font-size:.68rem;padding:.15rem .5rem;border-radius:1rem;font-weight:600}
+  #estadoSel{margin-left:auto;padding:.35rem .6rem;border:1px solid var(--border);border-radius:.5rem;font-size:.8rem;background:#fff}
+
+  #messages{flex:1;overflow-y:auto;padding:1.4rem;display:flex;flex-direction:column;gap:1.1rem}
+  .msg{display:flex;gap:.7rem;max-width:820px;width:100%}
+  .msg.user{align-self:flex-end;flex-direction:row-reverse}
+  .avatar{width:72px;height:72px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.95rem;position:relative}
+  .msg.user .avatar{background:var(--green);color:#fff}
+  .msg.ai .avatar{background:linear-gradient(135deg,#ffb400,#e25822);cursor:pointer;border:2px solid #7c2d12;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .15s}
+  .msg.ai .avatar:hover{transform:scale(1.12)}
+  .msg.ai .avatar.speaking{animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,180,0,.5)}50%{box-shadow:0 0 0 7px rgba(255,180,0,0)}}
+  .mouth{transform-box:fill-box;transform-origin:center}
+  .msg.ai .avatar.speaking .mouth{animation:talk .28s infinite alternate}
+  @keyframes talk{from{transform:scaleY(.25)}to{transform:scaleY(1.5)}}
+  .msg.ai .avatar.speaking{animation:pulse 1s infinite,talkBounce .28s infinite alternate}
+  @keyframes talkBounce{from{transform:translateY(0)}to{transform:translateY(-1.5px)}}
+  .msg.ai .avatar .brflag{position:absolute;right:-9px;bottom:-9px;font-size:1rem;background:#fff;border-radius:50%;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #006b24}
+  .msg.ai .avatar .who{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:.72rem;color:var(--muted);white-space:nowrap;font-weight:700;letter-spacing:.03em}
+  .tts-btn{background:none;border:0;cursor:pointer;font-size:.85rem;opacity:.45;padding:0 .2rem}
+  .tts-btn:hover{opacity:1}
+  .bubble{padding:.7rem .95rem;border-radius:1rem;font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+  .msg.ai .bubble{background:var(--ai-bubble);border:1px solid var(--border);border-top-left-radius:.25rem}
+  .msg.user .bubble{background:var(--user-bubble);color:#fff;border-top-right-radius:.25rem}
+  .meta{font-size:.68rem;color:var(--muted);margin-top:.35rem}
+  .meta .src{color:#2563eb}
+  .typing{display:inline-flex;gap:4px;padding:.9rem 1.1rem}
+  .typing span{width:7px;height:7px;border-radius:50%;background:#9ca3af;animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  /* ===== Composer ===== */
+  #composerWrap{padding:.9rem 1.4rem 1.2rem;background:#fff;border-top:1px solid var(--border)}
+  #composer{max-width:820px;margin:0 auto;border:1px solid var(--border);border-radius:1.2rem;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:border-color .15s}
+  #composer:focus-within{border-color:var(--green)}
+  #attachBar{display:none;gap:.4rem;flex-wrap:wrap;padding:.5rem .8rem 0}
+  #attachBar .chip{background:var(--green-light);color:var(--green-dark);border-radius:1rem;padding:.2rem .6rem;font-size:.72rem;display:flex;align-items:center;gap:.3rem}
+  #attachBar .chip button{background:none;border:0;color:var(--green-dark);cursor:pointer;font-weight:700}
+  #fileInput{display:none}
+  #composerRow{display:flex;align-items:flex-end;gap:.4rem;padding:.55rem .7rem}
+  #attachBtn{background:none;border:0;font-size:1.15rem;cursor:pointer;padding:.3rem;border-radius:.5rem;color:var(--muted)}
+  #attachBtn:hover{background:var(--green-light);color:var(--green)}
+  #input{flex:1;border:0;outline:0;resize:none;font-size:.92rem;font-family:inherit;max-height:160px;padding:.4rem .2rem;background:transparent;color:var(--text)}
+  #sendBtn{background:var(--green);color:#fff;border:0;width:36px;height:36px;border-radius:10px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background .15s}
+  #sendBtn:hover{background:var(--green-dark)}
+  #sendBtn:disabled{background:#d1d5db;cursor:wait}
+  #composerHint{max-width:820px;margin:.4rem auto 0;font-size:.68rem;color:var(--muted);text-align:center}
+
+  /* ===== Modal anexar ===== */
+  #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center}
+  #modal .box{background:#fff;border-radius:1rem;padding:1.4rem;width:380px;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  #modal h3{font-size:1rem;margin-bottom:.8rem}
+  #modal label{font-size:.75rem;color:var(--muted);display:block;margin:.5rem 0 .2rem}
+  #modal input,#modal select{width:100%;padding:.5rem;border:1px solid var(--border);border-radius:.5rem;font-size:.85rem}
+  #modal .actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem}
+  #modal .actions button{padding:.5rem 1rem;border-radius:.5rem;border:0;cursor:pointer;font-size:.82rem}
+  #modal .cancel{background:#f3f4f6;color:var(--text)}
+  #modal .confirm{background:var(--green);color:#fff}
+  .tool{background:var(--green-light);color:var(--green-dark);border:1px solid #b7e4c7;border-radius:1rem;padding:.35rem .8rem;font-size:.78rem;cursor:pointer;font-weight:600}
+  .tool:hover{background:#d3f2df}
+  .bubble h1,.bubble h2,.bubble h3{margin:.8rem 0 .4rem;font-size:1rem}
+  .bubble ul,.bubble ol{margin:.4rem 0 .4rem 1.2rem}
+  .bubble strong{color:var(--green-dark)}
+  .bubble code{background:#f3f4f6;padding:.1rem .3rem;border-radius:.25rem;font-size:.82rem}
+  .bubble pre{background:#0f172a;color:#e2e8f0;padding:.7rem;border-radius:.5rem;overflow-x:auto;font-size:.8rem}
+  .mermaid{background:#fff;border:1px solid var(--border);border-radius:.6rem;padding:.8rem;margin:.5rem 0;text-align:center;overflow-x:auto}
+  .flashcard{background:var(--green-light);border:1px solid #b7e4c7;border-radius:.6rem;padding:.8rem;margin:.4rem 0;cursor:pointer}
+  .flashcard .frente{font-weight:600;color:var(--green-dark)}
+  .flashcard .verso{display:none;margin-top:.5rem;padding-top:.5rem;border-top:1px dashed #b7e4c7;color:#14532d}
+  .flashcard.open .verso{display:block}
+  .questao-card{background:#fffbeb;border:1px solid #fde68a;border-radius:.6rem;padding:.9rem;margin:.5rem 0}
+  .questao-card .gab{color:#b45309;font-weight:700}
+
+  @media(max-width:720px){#sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="brand">
+    <div class="logo">⚖️<span class="flag">🇧🇷</span></div>
+    <div><b>NeuralJuris AI</b><small>Naruto · Concursos GO · TO · BA</small></div>
+  </div>
+  <nav>
+    <button class="side" onclick="newChat()">✎ &nbsp;Nova conversa</button>
+    <button class="side" onclick="document.getElementById('fileInput').click()">📎 &nbsp;Anexar documento</button>
+    <button class="side" onclick="loadDocs()">🔄 &nbsp;Atualizar documentos</button>
+  </nav>
+  <div class="section">Documentos na base</div>
+  <div id="docList" style="overflow-y:auto;flex:1"><div class="doc-item">Carregando...</div></div>
+  <footer>
+    Token de acesso<br>
+    <input type="password" id="tokenInput" placeholder="admin / neuraljuris">
+    <div id="iaStatus" style="margin-top:.4rem">IA: verificando...</div>
+  </footer>
+</aside>
+
+<main id="main">
+  <div id="chatHeader">
+    <div class="logo" style="width:56px;height:56px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;position:relative;border:2.5px solid #006b24;overflow:visible"><img src="/static/naruto.gif" alt="Naruto" style="width:50px;height:50px;border-radius:50%;object-fit:cover;display:block"><span style="position:absolute;right:-9px;bottom:-9px;font-size:.85rem;background:#fff;border-radius:50%;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #006b24">🇧🇷</span></div>
+    <div class="title">NeuralJuris AI <span style="font-size:.75rem;color:var(--muted);font-weight:400">· Naruto</span></div>
+    <span class="badge">LOCAL · OFFLINE</span>
+    <button id="exportBtn" title="Exportar conversa em PDF" style="background:var(--green-light);color:var(--green-dark);border:1px solid #b7e4c7;border-radius:.5rem;padding:.3rem .7rem;font-size:.78rem;cursor:pointer;font-weight:600">⬇ PDF</button>
+    <select id="voiceSel" title="Voz do Naruto" style="border:1px solid var(--border);border-radius:.5rem;padding:.3rem .45rem;font-size:.75rem;background:#fff"></select>
+    <select id="speedSel" title="Velocidade" style="border:1px solid var(--border);border-radius:.5rem;padding:.3rem .45rem;font-size:.75rem;background:#fff">
+      <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option>
+    </select>
+    <select id="estadoSel">
+      <option value="">Todos os estados</option>
+      <option value="GO">Goiás</option>
+      <option value="TO">Tocantins</option>
+      <option value="BA">Bahia</option>
+      <option value="FEDERAL">Federal</option>
+    </select>
+    <label style="font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:.3rem;margin-left:.5rem;cursor:pointer">
+      <input type="checkbox" id="webToggle" style="accent-color:var(--green)"> 🌐 Pesquisar na web
+    </label>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="composerWrap">
+    <div id="composer">
+      <div id="attachBar"></div>
+      <div id="composerRow">
+        <button id="attachBtn" title="Anexar PDF/DOCX/TXT">📎</button>
+        <select id="toolSel" title="Modo de resposta" style="border:1px solid var(--border);border-radius:.6rem;padding:.4rem .45rem;font-size:.8rem;background:#fff;color:var(--text);max-width:130px">
+          <option value="chat">💬 Chat</option>
+          <option value="firac">⚖️ FIRAC</option>
+          <option value="aula">📖 Aula</option>
+          <option value="mapa">🧠 Mapa mental</option>
+          <option value="questao">❓ Questão</option>
+          <option value="flashcards">🃏 Flashcards</option>
+        </select>
+        <textarea id="input" rows="1" placeholder="Pergunte sobre concursos, direito, legislação de GO/TO/BA..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+        <button id="sendBtn" onclick="send()">➤</button>
+      </div>
+    </div>
+    <div id="composerHint">NeuralJuris AI pode cometer erros. Verifique informações jurídicas críticas em fontes oficiais. · Enter envia · Shift+Enter quebra linha</div>
+  </div>
+</main>
+
+<input type="file" id="fileInput" accept=".pdf,.docx,.txt,.md" multiple>
+
+<div id="modal">
+  <div class="box">
+    <h3>📎 Anexar documento à base de conhecimento</h3>
+    <div id="pendingFiles" style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem"></div>
+    <label>Estado</label>
+    <select id="mEstado"><option>FEDERAL</option><option>GO</option><option>TO</option><option>BA</option></select>
+    <label>Disciplina</label>
+    <input id="mDisciplina" placeholder="Ex: Direito Constitucional">
+    <label>Assunto</label>
+    <input id="mAssunto" placeholder="Ex: TJ-GO, PMTO">
+    <div class="actions">
+      <button class="cancel" onclick="closeModal()">Cancelar</button>
+      <button class="confirm" id="modalConfirm">Indexar documentos</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/mermaid.min.js"></script>
+<script src="/static/marked.min.js"></script>
+<script src="/static/html2canvas.min.js"></script>
+<script src="/static/jspdf.umd.min.js"></script>
+<script>
+const API = location.origin;
+mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("sendBtn");
+const tokenInput = document.getElementById("tokenInput");
+const estadoSel = document.getElementById("estadoSel");
+let pendingFiles = [];
+
+// ===== Helpers =====
+function getToken(){ return tokenInput.value.trim(); }
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+// ===== Renderização Markdown + Mermaid =====
+function renderMarkdown(text){
+  let html = marked.parse(text || "");
+  // blocos ```mermaid viram div renderizável
+  html = html.replace(/<code class="language-mermaid">([\s\S]*?)<\/code>/g,
+    (m, code) => `<div class="mermaid">${code.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&")}</div>`);
+  return html;
+}
+async function renderAIContent(container, text){
+  container.innerHTML = renderMarkdown(text);
+  const els = container.querySelectorAll(".mermaid");
+  for(const el of els){
+    try{ await mermaid.run({ nodes: [el] }); }catch(e){ el.innerHTML = "<pre>" + esc(el.textContent) + "</pre>"; }
+  }
+}
+
+const NARUTO_AVATAR = `<img src="/static/naruto.gif" alt="Naruto" style="width:68px;height:68px;border-radius:12px;object-fit:cover;display:block">`;
+
+function addMsg(role, html, meta){
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const avatar = role === "ai"
+    ? `<div class="avatar" title="Naruto — clique para ouvir a resposta">${NARUTO_AVATAR}<span class="brflag">🇧🇷</span><span class="who">NARUTO</span></div>`
+    : `<div class="avatar">👤</div>`;
+  div.innerHTML = `${avatar}
+    <div><div class="bubble">${html}</div>${meta?`<div class="meta">${meta}</div>`:""}</div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+// ===== Naruto TTS (Kokoro — síntese local no backend) =====
+const tts = { voice: "pm_alex", speed: 1.0 };
+let audioPlayer = null; // {el, id, urls, idx, audio, btn, stopBtn, state}
+
+function cleanTtsText(msgEl){
+  const bubble = msgEl.querySelector(".bubble");
+  const raw = bubble.dataset.tts || bubble.innerText || "";
+  return raw.replace(/```[\s\S]*?```/g, " ").replace(/[#*`>_\-|]/g, " ").replace(/\s+/g, " ").trim();
+}
+function setSpeaking(msgEl, on){
+  const av = msgEl.querySelector(".avatar");
+  if(av) av.classList.toggle("speaking", !!on);
+}
+function finishAudio(p){
+  if(audioPlayer === p) audioPlayer = null;
+  setSpeaking(p.el, false);
+  if(p.btn){ p.btn.textContent = "🎧"; p.btn.title = "Ouvir resposta"; }
+  if(p.stopBtn) p.stopBtn.style.display = "none";
+}
+function stopAudio(){
+  if(!audioPlayer) return;
+  const p = audioPlayer;
+  p.state = "stopped";
+  try{ p.audio && p.audio.pause(); }catch(e){}
+  finishAudio(p);
+}
+async function playSegment(p){
+  if(!p || p.state === "stopped") return;
+  if(p.idx >= p.urls.length){ finishAudio(p); return; }
+  const a = new Audio(API + p.urls[p.idx]);
+  a.playbackRate = p.speed;
+  p.audio = a;
+  a.onended = () => { p.idx++; playSegment(p); };
+  a.onerror = () => { alert("Erro ao reproduzir segmento de áudio."); finishAudio(p); };
+  try{
+    await a.play();
+    p.state = "playing";
+    setSpeaking(p.el, true);
+    if(p.btn){ p.btn.textContent = "⏸"; p.btn.title = "Pausar"; }
+    if(p.stopBtn) p.stopBtn.style.display = "inline";
+  }catch(e){
+    finishAudio(p);
+    alert("Não foi possível reproduzir o áudio: " + e.message);
+  }
+}
+async function toggleAudio(msgEl, btn, stopBtn){
+  // se esta mensagem já está carregada/tocando → pausar/continuar/parar
+  if(audioPlayer && audioPlayer.el === msgEl){
+    const p = audioPlayer;
+    if(p.state === "playing" && p.audio){ p.audio.pause(); p.state = "paused"; p.btn.textContent = "▶"; p.btn.title = "Continuar"; setSpeaking(msgEl,false); }
+    else if(p.state === "paused" && p.audio){ p.state = "playing"; p.audio.play(); p.btn.textContent = "⏸"; p.btn.title = "Pausar"; setSpeaking(msgEl,true); }
+    else { stopAudio(); }
+    return;
+  }
+  stopAudio();
+  const text = cleanTtsText(msgEl);
+  if(!text){ alert("Sem texto para reproduzir."); return; }
+
+  const p = { el: msgEl, id: null, urls: [], idx: 0, audio: null, btn, stopBtn, speed: tts.speed, state: "loading" };
+  audioPlayer = p;
+  btn.textContent = "⏳"; btn.title = "Gerando áudio...";
+  if(stopBtn) stopBtn.style.display = "inline";
+  try{
+    const r = await fetch(API + "/tts/generate", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ text, voice: tts.voice, speed: tts.speed })
+    });
+    const d = await r.json();
+    if(!r.ok || !d.urls){ throw new Error(d.detail || "Falha na geração"); }
+    if(p.state === "stopped"){ finishAudio(p); return; }
+    p.id = d.id; p.urls = d.urls;
+    playSegment(p);
+  }catch(e){
+    finishAudio(p);
+    btn.textContent = "❌"; btn.title = "Erro no áudio";
+    setTimeout(()=>{ if(audioPlayer!==p){ btn.textContent="🎧"; btn.title="Ouvir resposta"; } }, 2000);
+    alert("Erro ao gerar áudio: " + e.message);
+  }
+}
+function stopBtnHandler(msgEl){
+  if(audioPlayer && audioPlayer.el === msgEl){ stopAudio(); }
+}
+messagesEl.addEventListener("click", (e) => {
+  const av = e.target.closest(".msg.ai .avatar");
+  if(av){
+    const msg = av.closest(".msg");
+    const playBtn = msg.querySelector(".aud-play");
+    if(playBtn) toggleAudio(msg, playBtn, msg.querySelector(".aud-stop"));
+  }
+  const sb = e.target.closest(".aud-stop");
+  if(sb){ stopBtnHandler(sb.closest(".msg")); }
+});
+// voz e velocidade globais (header)
+async function initTts(){
+  try{
+    const r = await fetch(API + "/tts/voices");
+    const d = await r.json();
+    const vs = document.getElementById("voiceSel");
+    if(vs && d.voices){
+      vs.innerHTML = d.voices.map(v => `<option value="${v.id}" ${v.padrao?"selected":""}>${v.nome}</option>`).join("");
+      tts.voice = vs.value;
+      vs.onchange = () => { tts.voice = vs.value; };
+    }
+    const st = document.getElementById("speedSel");
+    if(st) st.onchange = () => { tts.speed = parseFloat(st.value); };
+  }catch(e){}
+}
+
+// ===== Exportar para PDF =====
+async function exportPdf(msgEls, filename){
+  if(!msgEls.length) return;
+  const { jsPDF } = window.jspdf;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;left:-9999px;top:0;width:700px;background:#fff;color:#111;font-family:system-ui,sans-serif;padding:28px;z-index:-1";
+  wrap.innerHTML = `<div style="text-align:center;border-bottom:3px solid #009c3b;padding-bottom:10px;margin-bottom:18px">
+    <div style="font-size:22px;font-weight:800;color:#006b24">⚖️ NeuralJuris AI — por Naruto 🇧🇷</div>
+    <div style="font-size:11px;color:#666;margin-top:3px">Concursos GO · TO · BA · Exportado em ${new Date().toLocaleString("pt-BR")}</div></div>`;
+  msgEls.forEach(m=>{
+    const isUser = m.classList.contains("user");
+    const bubble = m.querySelector(".bubble");
+    if(!bubble || bubble.querySelector(".typing")) return;
+    const row = document.createElement("div");
+    row.style.cssText = "margin:12px 0;font-size:12px";
+    row.innerHTML = `<div style="font-weight:700;color:${isUser?"#009c3b":"#b45309"};margin-bottom:4px">${isUser?"Você":"Naruto (IA)"}</div>
+      <div style="background:${isUser?"#e8f7ec":"#f9fafb"};border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;line-height:1.55;word-wrap:break-word">${bubble.innerHTML}</div>`;
+    wrap.appendChild(row);
+  });
+  document.body.appendChild(wrap);
+  try{
+    const canvas = await html2canvas(wrap, { scale:2, useCORS:true, backgroundColor:"#ffffff" });
+    wrap.remove();
+    const pdf = new jsPDF({ unit:"mm", format:"a4" });
+    const margin=12, pageW=210, pageH=297;
+    const imgW=pageW-margin*2;
+    const imgH=canvas.height*imgW/canvas.width;
+    const contentH=pageH-margin*2;
+    if(imgH<=contentH){
+      pdf.addImage(canvas.toDataURL("image/png"),"PNG",margin,margin,imgW,imgH);
+    }else{
+      const slicePx=(contentH/imgH)*canvas.height;
+      let off=0;
+      while(off<canvas.height){
+        const h=Math.min(slicePx,canvas.height-off);
+        const c2=document.createElement("canvas");
+        c2.width=canvas.width; c2.height=h;
+        c2.getContext("2d").drawImage(canvas,0,off,canvas.width,h,0,0,canvas.width,h);
+        if(off>0) pdf.addPage();
+        pdf.addImage(c2.toDataURL("image/png"),"PNG",margin,margin,imgW,h/canvas.height*imgH);
+        off+=h;
+      }
+    }
+    pdf.save(filename || ("neuraljuris-"+new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")+".pdf"));
+  }catch(e){
+    wrap.remove();
+    alert("Erro ao gerar PDF: " + e.message);
+  }
+}
+document.getElementById("exportBtn").onclick = () =>
+  exportPdf([...document.querySelectorAll("#messages .msg")], "neuraljuris-conversa.pdf");
+
+function systemMsg(text){
+  const d = document.createElement("div");
+  d.style.cssText = "text-align:center;font-size:.75rem;color:var(--muted);margin:.3rem 0";
+  d.textContent = text;
+  messagesEl.appendChild(d);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function newChat(){
+  messagesEl.innerHTML = "";
+  addMsg("ai", "Olá! Sou a **NeuralJuris AI**, sua assistente para concursos de **Goiás, Tocantins e Bahia**. 📚\n\nPosso ajudar com:\n• Explicar disciplinas e legislação estadual\n• Resumir e comentar seus documentos anexados\n• Responder questões sobre o conteúdo programático\n\n📎 Anexe PDFs, apostilas ou editais pelo botão de clipe — eu indexo e passo a usá-los nas respostas.");
+}
+
+// ===== Envio de mensagem =====
+const TOOL_META = {
+  firac:      { endpoint:"/intelligence/firac",      body:(t)=>({ pergunta:t, estado:estadoSel.value||null, incluir_jurisprudencia:true }) },
+  aula:       { endpoint:"/intelligence/aula",       body:(t)=>({ tema:t, estado:estadoSel.value||null, detalhes:null }) },
+  mapa:       { endpoint:"/intelligence/mapa-mental",body:(t)=>({ tema:t, estado:estadoSel.value||null, detalhes:null }) },
+  questao:    { endpoint:"/intelligence/questao",    body:(t)=>{
+      const partes = t.split(/\s+[—–-]\s+|\s*\/\s*/);
+      return { disciplina: partes[0]||t, assunto: partes[1]||null, estado: estadoSel.value||"FEDERAL", detalhes:null };
+    }},
+  flashcards: { endpoint:"/intelligence/flashcards", body:(t)=>({ tema:t, estado:estadoSel.value||null, detalhes:null }) },
+};
+
+async function renderToolResult(container, tool, d){
+  if(tool === "mapa" && d.mermaid){
+    container.innerHTML = `<div class="mermaid">${esc(d.mermaid)}</div>`;
+    try{ await mermaid.run({ nodes: container.querySelectorAll(".mermaid") }); }catch(e){ container.innerHTML = "<pre>"+esc(d.mermaid)+"</pre>"; }
+    return;
+  }
+  if(tool === "questao" && d.enunciado){
+    const alts = Object.entries(d.alternativas||{}).map(([k,v])=>`${k}) ${v}`).join("<br>");
+    container.innerHTML = `<div class="questao-card">
+      <span class="tag">${esc(d.disciplina||"")}</span><span class="tag">${esc(d.nivel||"")}</span>
+      <div style="margin:.4rem 0">${esc(d.enunciado)}</div>
+      <div style="font-size:.85rem">${alts}</div>
+      <div class="gab" style="margin-top:.4rem">Gabarito: ${esc(d.gabarito||"")} · Status: ${esc(d.status_validacao||"")}</div>
+      ${d.fundamentacao?`<div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">${esc(d.fundamentacao)}</div>`:""}
+      ${d.validacao?`<div style="font-size:.75rem;color:${d.validacao.aprovada?'#059669':'#d97706'};margin-top:.3rem">Validação: ${d.validacao.aprovada?"✓ aprovada":"⚠ pendente revisão"}${d.validacao.gabarito_confere===false?" — revisor diverge do gabarito":""}</div>`:""}
+    </div>`;
+    return;
+  }
+  if(tool === "flashcards" && d.flashcards){
+    container.innerHTML = d.flashcards.map((f,i)=>`<div class="flashcard" onclick="this.classList.toggle('open')"><div class="frente">${i+1}. ${esc(f.frente)}</div><div class="verso">${esc(f.verso)}</div></div>`).join("");
+    return;
+  }
+  const texto = d.analise || d.aula || d.resposta || JSON.stringify(d);
+  await renderAIContent(container, texto);
+}
+
+async function send(){
+  const text = inputEl.value.trim();
+  if(!text) return;
+  const tool = document.getElementById("toolSel").value;
+  stopAudio();
+  inputEl.value = "";
+  inputEl.style.height = "auto";
+  addMsg("user", esc(text));
+  const typing = addMsg("ai", `<div class="typing"><span></span><span></span><span></span></div>`);
+  sendBtn.disabled = true;
+
+  try{
+    const bubble = typing.querySelector(".bubble");
+    if(tool === "chat"){
+      const r = await fetch(API + "/ask", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ pergunta: text, estado: estadoSel.value || null, pesquisar_web: document.getElementById("webToggle").checked })
+      });
+      const d = await r.json();
+      if(d.resposta){ await renderAIContent(bubble, d.resposta); bubble.dataset.tts = d.resposta; }
+      else{ const ctx = d.contexto || "Sem resposta."; bubble.innerHTML = esc(ctx).replace(/\n/g,"<br>"); bubble.dataset.tts = ctx; }
+      const meta = [];
+      if(d.fontes_usadas) meta.push(`${d.fontes_usadas} fonte(s) local`);
+      if(d.fontes_web) meta.push(`${d.fontes_web} fonte(s) web`);
+      meta.push("IA: " + (d.ia_disponivel ? "online" : "offline"));
+      if(d.aviso) meta.push(d.aviso);
+      const m = document.createElement("div");
+      m.className = "meta"; m.innerHTML = meta.join(" · ") + ` <button class="tts-btn aud-play" title="Ouvir resposta">🎧</button> <button class="tts-btn aud-stop" title="Parar" style="display:none">⏹</button> <button class="tts-btn pdf-btn" title="Baixar esta resposta em PDF">⬇</button>`;
+      typing.querySelector("div").appendChild(m);
+      m.querySelector(".aud-play").onclick = (e) => toggleAudio(typing, e.target, m.querySelector(".aud-stop"));
+      m.querySelector(".pdf-btn").onclick = () => exportPdf([typing], "neuraljuris-resposta.pdf");
+    } else {
+      const meta = TOOL_META[tool];
+      const headers = { "Content-Type":"application/json" };
+      if(tool === "questao" && getToken()) headers["Authorization"] = "Bearer " + getToken();
+      const r = await fetch(API + meta.endpoint, { method:"POST", headers, body: JSON.stringify(meta.body(text)) });
+      const d = await r.json();
+      if(d.detail){ bubble.textContent = "Erro: " + d.detail; }
+      else{
+        await renderToolResult(bubble, tool, d);
+        bubble.dataset.tts = d.analise || d.aula || d.enunciado || d.resposta || "";
+        const m = document.createElement("div");
+        m.className = "meta"; m.innerHTML = `⚙️ ${tool} · gerado localmente <button class="tts-btn aud-play" title="Ouvir">🎧</button> <button class="tts-btn aud-stop" title="Parar" style="display:none">⏹</button> <button class="tts-btn pdf-btn" title="Baixar em PDF">⬇</button>`;
+        typing.querySelector("div").appendChild(m);
+        m.querySelector(".aud-play").onclick = (e) => toggleAudio(typing, e.target, m.querySelector(".aud-stop"));
+        m.querySelector(".pdf-btn").onclick = () => exportPdf([typing], "neuraljuris-" + tool + ".pdf");
+      }
+    }
+  }catch(e){
+    typing.querySelector(".bubble").textContent = "Erro ao consultar a API.";
+  }
+  sendBtn.disabled = false;
+  inputEl.focus();
+}
+
+// ===== Anexos =====
+function openModal(files){
+  pendingFiles = [...files];
+  document.getElementById("pendingFiles").textContent =
+    pendingFiles.map(f=>"📄 "+f.name).join("  ");
+  document.getElementById("modal").style.display = "flex";
+}
+function closeModal(){ document.getElementById("modal").style.display = "none"; pendingFiles=[]; }
+
+document.getElementById("attachBtn").onclick = () => document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange = (e) => { if(e.target.files.length) openModal(e.target.files); e.target.value=""; };
+
+document.getElementById("modalConfirm").onclick = async () => {
+  const token = getToken();
+  if(!token){ alert("Informe o token de acesso na barra lateral (admin / neuraljuris)"); return; }
+  const estado = document.getElementById("mEstado").value;
+  const disc = document.getElementById("mDisciplina").value;
+  const ass = document.getElementById("mAssunto").value;
+  const bar = document.getElementById("attachBar");
+  bar.style.display = "flex";
+
+  for(const f of pendingFiles){
+    const chip = document.createElement("span");
+    chip.className = "chip"; chip.textContent = "⏳ " + f.name;
+    bar.appendChild(chip);
+    const fd = new FormData();
+    fd.append("file", f); fd.append("estado", estado);
+    fd.append("disciplina", disc); fd.append("assunto", ass);
+    try{
+      const r = await fetch(API + "/documents/upload", { method:"POST", headers:{"Authorization":"Bearer "+token}, body:fd });
+      const d = await r.json();
+      chip.innerHTML = (r.ok ? "✅ " : "❌ ") + esc(f.name) + `<button onclick="this.parentElement.remove()">×</button>`;
+      if(r.ok) systemMsg(`Documento "${f.name}" indexado: ${d.chunks} trechos, ${d.chars} caracteres ${d.embeddings?"(com embeddings)":""}.`);
+      else chip.title = d.detail || "erro";
+    }catch(err){ chip.textContent = "❌ " + f.name; }
+  }
+  closeModal();
+  loadDocs();
+};
+
+// ===== Sidebar: documentos e status =====
+async function loadDocs(){
+  try{
+    const r = await fetch(API + "/documents");
+    const d = await r.json();
+    const el = document.getElementById("docList");
+    if(!d.total){ el.innerHTML = '<div class="doc-item" style="color:#86efac">Nenhum documento ainda</div>'; return; }
+    el.innerHTML = d.documents.map(doc =>
+      `<div class="doc-item" title="${esc(doc.original_name)}"><span class="tag">${doc.estado}</span>${esc(doc.original_name)}<br><span style="color:#6ee7a0;font-size:.65rem">${doc.disciplina||""} ${doc.chars} chars</span></div>`
+    ).join("");
+  }catch(e){}
+}
+
+async function checkStatus(){
+  try{
+    const r = await fetch(API + "/status");
+    const d = await r.json();
+    document.getElementById("iaStatus").textContent =
+      "IA: " + (d.ollama_disponivel ? "🟢 online (" + d.modelo + ")" : "🔴 offline");
+  }catch(e){ document.getElementById("iaStatus").textContent = "IA: 🔴 API offline"; }
+}
+
+// ===== Init =====
+inputEl.addEventListener("input", () => {
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+});
+newChat();
+loadDocs();
+checkStatus();
+initTts();
+setInterval(()=>{ loadDocs(); checkStatus(); }, 30000);
+</script>
+</body>
+</html>
